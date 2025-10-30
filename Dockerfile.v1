@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# ... [previous install commands] ...
+
+# Create necessary directories first
+RUN mkdir -p /app/ansible_roles /app/playbooks /app/kubeconfigs /app/.kube /app/static/css /app/static/js
+
+# DEBUG: Check what's available before copying
+RUN echo "=== BEFORE COPY ===" && \
+    find /app -type f -name "*.css" -o -name "*.js" | head -10
+
+# Copy static files with verification
+COPY css/dashboard.css /app/static/css/dashboard.css
+RUN echo "=== AFTER CSS COPY ===" && \
+    ls -la /app/static/css/ && \
+    cat /app/static/css/dashboard.css | head -5
+
+COPY js/clusters.js /app/static/js/clusters.js
+RUN echo "=== AFTER JS COPY ===" && \
+    ls -la /app/static/js/ && \
+    cat /app/static/js/clusters.js | head -5
+
+# Copy the rest
+COPY api/ /app/api/
+COPY config/ /app/config/
+COPY core/ /app/core/
+COPY modules/ /app/modules/
+COPY utils/ /app/utils/
+COPY *.html /app/
+
+# Final check
+RUN echo "=== FINAL CHECK ===" && \
+    find /app/static -type f && \
+    echo "Files in static/css:" && ls -la /app/static/css/ && \
+    echo "Files in static/js:" && ls -la /app/static/js/
+
+# ... [rest of Dockerfile] ...

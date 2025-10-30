@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Kubeconfig - Ansible Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .user-info {
+            background: #e7f3ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-custom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border: 2px dashed #e1e5e9;
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-custom:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-input-custom.has-file {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .file-name {
+            color: #666;
+            font-size: 14px;
+            flex-grow: 1;
+        }
+
+        .browse-btn {
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .result.loading {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+            display: block;
+        }
+
+        .cluster-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .login-prompt {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Register Kubernetes Cluster</h1>
+            <p>Upload your kubeconfig file to register a new cluster</p>
+        </div>
+
+        <div id="loginPrompt" class="login-prompt">
+            <h3>🔐 Authentication Required</h3>
+            <p>Please login first to register clusters</p>
+            <button class="login-btn" onclick="goToLogin()">Go to Login</button>
+        </div>
+
+        <div id="uploadFormContainer" class="hidden">
+            <div id="userInfo" class="user-info">
+                Logged in as: <strong id="usernameDisplay"></strong>
+                <button style="float: right; background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px;" onclick="logout()">Logout</button>
+            </div>
+
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="name">Cluster Name *</label>
+                    <input type="text" id="name" name="name" placeholder="e.g., production-cluster" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description (Optional)</label>
+                    <input type="text" id="description" name="description" placeholder="e.g., Production Kubernetes cluster">
+                </div>
+
+                <div class="form-group">
+                    <label for="kubeconfig_file">Kubeconfig File *</label>
+                    <div class="file-input-wrapper">
+                        <div class="file-input-custom" id="fileInputCustom">
+                            <span class="file-name" id="fileName">No file chosen</span>
+                            <span class="browse-btn">Browse</span>
+                        </div>
+                        <input type="file" id="kubeconfig_file" name="kubeconfig_file" 
+                               accept=".yaml,.yml,.config" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Register Cluster
+                </button>
+            </form>
+
+            <div id="result"></div>
+            <div style="text-align: center; margin-top: 20px;">
+    		<a href="/clusters-dashboard" style="color: #667eea; text-decoration: none;">
+        		← Back to Clusters Dashboard
+    		</a>
+	    </div>
+
+            <div id="successInfo" class="cluster-info hidden">
+                <h4>🎉 Cluster Registered Successfully!</h4>
+                <p><strong>ID:</strong> <span id="clusterId"></span></p>
+                <p><strong>Name:</strong> <span id="clusterName"></span></p>
+                <p><strong>API Server:</strong> <span id="clusterApiServer"></span></p>
+                <p><strong>Status:</strong> <span id="clusterStatus"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if user is logged in
+        function checkAuth() {
+            const token = localStorage.getItem('ansible_token');
+            const username = localStorage.getItem('ansible_username');
+            
+            if (token && username) {
+                document.getElementById('loginPrompt').classList.add('hidden');
+                document.getElementById('uploadFormContainer').classList.remove('hidden');
+                document.getElementById('usernameDisplay').textContent = username;
+                return token;
+            } else {
+                document.getElementById('loginPrompt').classList.remove('hidden');
+                document.getElementById('uploadFormContainer').classList.add('hidden');
+                return null;
+            }
+        }
+
+        // File input handling
+        const fileInput = document.getElementById('kubeconfig_file');
+        const fileInputCustom = document.getElementById('fileInputCustom');
+        const fileName = document.getElementById('fileName');
+
+        fileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                const file = this.files[0];
+                fileName.textContent = file.name;
+                fileInputCustom.classList.add('has-file');
+            } else {
+                fileName.textContent = 'No file chosen';
+                fileInputCustom.classList.remove('has-file');
+            }
+        });
+
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const token = checkAuth();
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('name', document.getElementById('name').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('kubeconfig_file', fileInput.files[0]);
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            // Show loading state
+            showResult('loading', 'Uploading and validating kubeconfig file...');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="loading-spinner"></div> Registering...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/clusters/register/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', 'Cluster registered successfully!');
+                    showSuccessInfo(data);
+                } else {
+                    showResult('error', `Error: ${data.detail || 'Unknown error occurred'}`);
+                }
+            } catch (error) {
+                showResult('error', `Network error: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Register Cluster';
+            }
+        });
+
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            if (type === 'loading') {
+                resultDiv.innerHTML = `<div class="loading-spinner"></div> ${message}`;
+            } else {
+                resultDiv.innerHTML = message;
+            }
+            resultDiv.style.display = 'block';
+        }
+
+        function showSuccessInfo(clusterData) {
+            document.getElementById('clusterId').textContent = clusterData.id;
+            document.getElementById('clusterName').textContent = clusterData.name;
+            document.getElementById('clusterApiServer').textContent = clusterData.api_server || 'N/A';
+            document.getElementById('clusterStatus').textContent = clusterData.status;
+            document.getElementById('successInfo').classList.remove('hidden');
+        }
+
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+
+        function logout() {
+            localStorage.removeItem('ansible_token');
+            localStorage.removeItem('ansible_username');
+            checkAuth();
+        }
+
+        // Check authentication on page load
+        checkAuth();
+    </script>
+</body>
+</html>

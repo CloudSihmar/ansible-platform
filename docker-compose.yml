@@ -1,0 +1,49 @@
+services:
+  ansible-db:
+    image: postgres:17
+    container_name: ansible-db
+    environment:
+      POSTGRES_DB: ansible_platform
+      POSTGRES_USER: ansible_user
+      POSTGRES_PASSWORD: ansible_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ansible-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ansible_user -d ansible_platform"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ansible-platform:
+    build: .
+    container_name: ansible-platform
+    environment:
+      - DATABASE_URL=postgresql://ansible_user:ansible_password@ansible-db:5432/ansible_platform
+      - SECRET_KEY=your-super-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      ansible-db:
+        condition: service_healthy
+    volumes:
+      - ansible_roles:/app/ansible_roles
+      - playbooks:/app/playbooks
+      - kubeconfigs:/app/kubeconfigs
+    networks:
+      - ansible-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ansible_roles:
+  playbooks:
+  kubeconfigs:
+
+networks:
+  ansible-network:
+    driver: bridge

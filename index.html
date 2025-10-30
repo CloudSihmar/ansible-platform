@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ansible Platform - Kubernetes Cluster Management</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>Ansible Platform</h1>
+                <p>Login to access Kubernetes cluster management</p>
+            </div>
+
+            <div class="test-credentials">
+                <h3>🧪 Test Credentials</h3>
+                <p><strong>Username:</strong> testuser</p>
+                <p><strong>Password:</strong> testpassword</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" placeholder="Enter password" required>
+                </div>
+
+                <button type="submit" class="submit-btn" id="loginBtn">
+                    Login
+                </button>
+            </form>
+
+            <div id="loginResult" class="login-result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="dashboard-container hidden">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Ansible Platform</h1>
+                <div class="header-actions">
+                    <span id="usernameDisplay" class="username"></span>
+                    <button onclick="logout()" class="btn-logout">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="dashboard-nav">
+            <div class="nav-content">
+                <a href="#" class="nav-link active" onclick="navigateTo('clustersSection')">🏠 Clusters</a>
+                <a href="#" class="nav-link" onclick="navigateTo('registerSection')">📁 Register Cluster</a>
+                <a href="#" class="nav-link" onclick="navigateTo('nodesSection')">🖥️ All Nodes</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Clusters Section -->
+            <section id="clustersSection" class="content-section active">
+                <div class="grid-header">
+                    <h2>Kubernetes Clusters</h2>
+                    <button onclick="loadClusters()" class="btn-refresh">🔄 Refresh</button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="clustersSectionLoading" class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading clusters...</p>
+                </div>
+
+                <!-- Error State -->
+                <div id="clustersSectionError" class="error-state hidden">
+                    <h3>❌ Error Loading Clusters</h3>
+                    <p id="clustersSectionErrorMessage"></p>
+                    <button onclick="loadClusters()" class="btn-retry">Retry</button>
+                </div>
+
+                <!-- Content -->
+                <div id="clustersSectionContent" class="clusters-grid">
+                    <div id="clustersEmpty" class="empty-state hidden">
+                        <h3>No clusters found</h3>
+                        <p>Get started by registering your first Kubernetes cluster</p>
+                        <button onclick="navigateTo('registerSection')" class="btn-primary">Register Cluster</button>
+                    </div>
+                    <div id="clustersList" class="clusters-list">
+                        <!-- Clusters will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Register Cluster Section -->
+            <section id="registerSection" class="content-section">
+                <div class="grid-header">
+                    <h2>Register Kubernetes Cluster</h2>
+                </div>
+
+                <form id="uploadForm" class="upload-form" onsubmit="handleClusterRegistration(event)">
+                    <div class="form-group">
+                        <label for="clusterName">Cluster Name *</label>
+                        <input type="text" id="clusterName" name="clusterName" placeholder="e.g., production-cluster" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="clusterDescription">Description (Optional)</label>
+                        <input type="text" id="clusterDescription" name="clusterDescription" placeholder="e.g., Production Kubernetes cluster">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="kubeconfigFile">Kubeconfig File *</label>
+                        <div class="file-input-wrapper">
+                            <div class="file-input-custom" id="fileInputCustom">
+                                <span class="file-name" id="fileName">No file chosen</span>
+                                <span class="browse-btn">Browse</span>
+                            </div>
+                            <input type="file" id="kubeconfigFile" name="kubeconfig_file" 
+                                   accept=".yaml,.yml,.config" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="registerClusterBtn">
+                        Register Cluster
+                    </button>
+                </form>
+
+                <div id="uploadResult" style="margin-top: 20px; display: none;"></div>
+            </section>
+
+            <!-- Nodes Section -->
+            <section id="nodesSection" class="content-section">
+                <div class="grid-header">
+                    <h2>All Cluster Nodes</h2>
+                    <button onclick="loadAllNodes()" class="btn-refresh">🔄 Refresh</button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="nodesSectionLoading" class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading nodes...</p>
+                </div>
+
+                <!-- Error State -->
+                <div id="nodesSectionError" class="error-state hidden">
+                    <h3>❌ Error Loading Nodes</h3>
+                    <p id="nodesSectionErrorMessage"></p>
+                    <button onclick="loadAllNodes()" class="btn-retry">Retry</button>
+                </div>
+
+                <!-- Content -->
+                <div id="nodesSectionContent" class="clusters-grid">
+                    <div id="nodesEmpty" class="empty-state hidden">
+                        <h3>No nodes found</h3>
+                        <p>Register a cluster first to see its nodes</p>
+                        <button onclick="navigateTo('registerSection')" class="btn-primary">Register Cluster</button>
+                    </div>
+                    <div id="nodesList" class="clusters-list">
+                        <!-- Nodes will be populated here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

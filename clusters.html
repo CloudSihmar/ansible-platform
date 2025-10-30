@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Clusters - Ansible Platform</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Kubernetes Cluster Dashboard</h1>
+            <p>Manage and monitor your Kubernetes clusters</p>
+        </div>
+
+        <div id="userInfo" class="user-info">
+            <div>
+                <strong>Logged in as:</strong> <span id="usernameDisplay">Loading...</span>
+            </div>
+            <div>
+                <button class="refresh-btn" onclick="loadClusters()">🔄 Refresh</button>
+                <button class="btn btn-primary" onclick="goToUpload()">➕ Register Cluster</button>
+                <button class="btn btn-warning" onclick="logout()">🚪 Logout</button>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="tab active" onclick="showTab('overview')">📊 Overview</button>
+            <button class="tab" onclick="showTab('clusters')">🏢 Clusters</button>
+            <button class="tab" onclick="showTab('nodes')">🖥️ Nodes</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="content-section active">
+            <h2>Cluster Overview</h2>
+            <div id="statsGrid" class="stats-grid">
+                <!-- Stats will be populated by JavaScript -->
+            </div>
+            
+            <div id="overviewContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Clusters Tab -->
+        <div id="clusters" class="content-section">
+            <h2>Your Clusters</h2>
+            <div id="clustersList">
+                <!-- Clusters will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Nodes Tab -->
+        <div id="nodes" class="content-section">
+            <h2>All Cluster Nodes</h2>
+            <div id="nodesGrid" class="nodes-grid">
+                <!-- Nodes will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

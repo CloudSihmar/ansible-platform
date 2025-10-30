@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Details - Ansible Platform</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1 id="clusterTitle">Cluster Details</h1>
+                <div class="header-actions">
+                    <span id="usernameDisplay" class="username"></span>
+                    <a href="/clusters-dashboard" class="btn-secondary">← Back to Clusters</a>
+                    <button onclick="logout()" class="btn-logout">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Login Prompt -->
+        <div id="loginPrompt" class="login-prompt">
+            <div class="prompt-content">
+                <h3>🔐 Authentication Required</h3>
+                <p>Please login first to view cluster details</p>
+                <button class="btn-login" onclick="goToLogin()">Go to Login</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="dashboardContent" class="dashboard-content hidden">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Loading cluster details...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state hidden">
+                <h3>❌ Error Loading Cluster</h3>
+                <p id="errorMessage"></p>
+                <button onclick="loadClusterDetails()" class="btn-retry">Retry</button>
+            </div>
+
+            <!-- Cluster Details -->
+            <div id="clusterDetails" class="cluster-details hidden">
+                <!-- Cluster Info Card -->
+                <div class="cluster-info-card">
+                    <div class="card-header">
+                        <h2 id="clusterName">Cluster Name</h2>
+                        <div class="cluster-actions">
+                            <button onclick="refreshNodes()" class="btn-refresh">🔄 Refresh Nodes</button>
+                            <button onclick="checkClusterHealth()" class="btn-health">❤️ Check Health</button>
+                        </div>
+                    </div>
+                    
+                    <div class="cluster-meta">
+                        <div class="meta-item">
+                            <label>Status:</label>
+                            <span id="clusterStatus" class="status-badge">Unknown</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>Type:</label>
+                            <span id="clusterType">-</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>API Server:</label>
+                            <span id="clusterApiServer">-</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>Auth Type:</label>
+                            <span id="clusterAuthType">-</span>
+                        </div>
+                        <div class="meta-item">
+                            <label>Registered:</label>
+                            <span id="clusterCreatedAt">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Health Status -->
+                <div id="healthCard" class="info-card hidden">
+                    <h3>Cluster Health</h3>
+                    <div id="healthContent"></div>
+                </div>
+
+                <!-- Nodes Summary -->
+                <div class="info-card">
+                    <div class="card-header">
+                        <h3>Nodes Summary</h3>
+                        <button onclick="loadNodeSummary()" class="btn-refresh-small">🔄</button>
+                    </div>
+                    <div id="nodesSummaryContent">
+                        <div class="loading-small">Loading nodes...</div>
+                    </div>
+                </div>
+
+                <!-- Detailed Nodes List -->
+                <div class="info-card">
+                    <div class="card-header">
+                        <h3>Cluster Nodes</h3>
+                    </div>
+                    <div id="nodesListContent">
+                        <div class="loading-small">Loading node details...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/clusters.js"></script>
+    <script>
+        let currentClusterId = null;
+
+        // Get cluster ID from URL parameters
+        function getClusterIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+
+        // Load cluster details
+        async function loadClusterDetails() {
+            const clusterId = getClusterIdFromUrl();
+            if (!clusterId) {
+                showError('No cluster ID provided');
+                return;
+            }
+
+            currentClusterId = clusterId;
+            showLoading();
+            hideError();
+
+            try {
+                // Load basic cluster info
+                const cluster = await apiGet(`/api/clusters/${clusterId}`);
+                displayClusterInfo(cluster);
+
+                // Load node summary
+                await loadNodeSummary();
+
+                // Load detailed nodes
+                await loadNodesList();
+
+                showContent();
+
+            } catch (error) {
+                showError(`Failed to load cluster: ${error.message}`);
+            }
+        }
+
+        function displayClusterInfo(cluster) {
+            document.getElementById('clusterTitle').textContent = cluster.name;
+            document.getElementById('clusterName').textContent = cluster.name;
+            document.getElementById('clusterStatus').textContent = cluster.status;
+            document.getElementById('clusterStatus').className = `status-badge status-${cluster.status.toLowerCase()}`;
+            document.getElementById('clusterType').textContent = cluster.cluster_type;
+            document.getElementById('clusterApiServer').textContent = cluster.api_server || 'Not available';
+            document.getElementById('clusterAuthType').textContent = cluster.auth_type || 'kubeconfig';
+            document.getElementById('clusterCreatedAt').textContent = new Date(cluster.created_at).toLocaleString();
+        }
+
+        async function loadNodeSummary() {
+            try {
+                const summary = await apiGet(`/api/clusters/${currentClusterId}/nodes/summary`);
+                displayNodeSummary(summary);
+            } catch (error) {
+                document.getElementById('nodesSummaryContent').innerHTML = 
+                    `<div class="error-small">Failed to load node summary: ${error.message}</div>`;
+            }
+        }
+
+        function displayNodeSummary(summary) {
+            if (summary.error) {
+                document.getElementById('nodesSummaryContent').innerHTML = 
+                    `<div class="error-small">${summary.error}</div>`;
+                return;
+            }
+
+            const html = `
+                <div class="nodes-summary">
+                    <div class="summary-item">
+                        <div class="summary-value">${summary.total_nodes}</div>
+                        <div class="summary-label">Total Nodes</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value master">${summary.master_nodes}</div>
+                        <div class="summary-label">Master Nodes</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value worker">${summary.worker_nodes}</div>
+                        <div class="summary-label">Worker Nodes</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">${summary.auth_type}</div>
+                        <div class="summary-label">Auth Type</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('nodesSummaryContent').innerHTML = html;
+        }
+
+        async function loadNodesList() {
+            try {
+                const nodes = await apiGet(`/api/clusters/${currentClusterId}/nodes`);
+                displayNodesList(nodes);
+            } catch (error) {
+                document.getElementById('nodesListContent').innerHTML = 
+                    `<div class="error-small">Failed to load nodes: ${error.message}</div>`;
+            }
+        }
+
+        function displayNodesList(nodes) {
+            if (!nodes || nodes.length === 0) {
+                document.getElementById('nodesListContent').innerHTML = 
+                    `<div class="empty-small">No nodes found</div>`;
+                return;
+            }
+
+            const nodesHtml = nodes.map(node => `
+                <div class="node-item">
+                    <div class="node-header">
+                        <span class="node-name">${node.hostname}</span>
+                        <span class="node-type ${node.node_type}">${node.node_type}</span>
+                    </div>
+                    <div class="node-details">
+                        <span class="node-ip">IP: ${node.ip_address || 'Unknown'}</span>
+                        <span class="node-status status-${node.status.toLowerCase()}">${node.status}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('nodesListContent').innerHTML = nodesHtml;
+        }
+
+        async function refreshNodes() {
+            try {
+                showNotification('Refreshing nodes...', 'info');
+                const result = await apiPost(`/api/clusters/${currentClusterId}/nodes/refresh`, {});
+                
+                showNotification('Nodes refreshed successfully', 'success');
+                await loadNodeSummary();
+                await loadNodesList();
+                
+            } catch (error) {
+                showNotification(`Failed to refresh nodes: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkClusterHealth() {
+            try {
+                showNotification('Checking cluster health...', 'info');
+                const health = await apiGet(`/api/clusters/${currentClusterId}/health`);
+                displayHealthStatus(health);
+                
+            } catch (error) {
+                showNotification(`Failed to check health: ${error.message}`, 'error');
+            }
+        }
+
+        function displayHealthStatus(health) {
+            const healthCard = document.getElementById('healthCard');
+            const healthContent = document.getElementById('healthContent');
+            
+            const statusClass = `health-${health.health_status.toLowerCase()}`;
+            
+            healthContent.innerHTML = `
+                <div class="health-status ${statusClass}">
+                    <div class="health-icon">${getHealthIcon(health.health_status)}</div>
+                    <div class="health-info">
+                        <div class="health-title">${health.health_status.toUpperCase()}</div>
+                        <div class="health-details">
+                            Cluster "${health.name}" is ${health.health_status}
+                            ${health.node_summary ? `- ${health.node_summary.total_nodes} nodes` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            healthCard.classList.remove('hidden');
+        }
+
+        function getHealthIcon(status) {
+            const icons = {
+                'healthy': '✅',
+                'warning': '⚠️',
+                'critical': '❌',
+                'unknown': '❓'
+            };
+            return icons[status.toLowerCase()] || '❓';
+        }
+
+        // Initialize details page
+        document.addEventListener('DOMContentLoaded', function() {
+            if (checkAuth()) {
+                loadClusterDetails();
+            }
+        });
+    </script>
+</body>
+</html>

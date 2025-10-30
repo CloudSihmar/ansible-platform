@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Clusters - Ansible Platform</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Kubernetes Clusters</h1>
+                <div class="header-actions">
+                    <span id="usernameDisplay" class="username"></span>
+                    <button onclick="logout()" class="btn-logout">Logout</button>
+                    <a href="/upload" class="btn-primary">Register New Cluster</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Login Prompt -->
+        <div id="loginPrompt" class="login-prompt">
+            <div class="prompt-content">
+                <h3>🔐 Authentication Required</h3>
+                <p>Please login first to view clusters</p>
+                <button class="btn-login" onclick="goToLogin()">Go to Login</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="dashboardContent" class="dashboard-content hidden">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Loading clusters...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state hidden">
+                <h3>❌ Error Loading Clusters</h3>
+                <p id="errorMessage"></p>
+                <button onclick="loadClusters()" class="btn-retry">Retry</button>
+            </div>
+
+            <!-- Clusters Grid -->
+            <div id="clustersGrid" class="clusters-grid hidden">
+                <div class="grid-header">
+                    <h2>Your Clusters</h2>
+                    <button onclick="loadClusters()" class="btn-refresh">🔄 Refresh</button>
+                </div>
+                
+                <div id="clustersList" class="clusters-list">
+                    <!-- Clusters will be populated here -->
+                </div>
+
+                <div id="emptyState" class="empty-state hidden">
+                    <h3>No clusters found</h3>
+                    <p>Get started by registering your first Kubernetes cluster</p>
+                    <a href="/upload" class="btn-primary">Register Cluster</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/clusters.js"></script>
+    <script>
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+        if (checkAuth()) {
+            loadClusters(); // Add this line to automatically load clusters
+        }
+    	});
+    </script>
+</body>
+</html>
