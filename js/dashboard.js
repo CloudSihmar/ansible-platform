@@ -88,6 +88,12 @@ async function apiPost(endpoint, data) {
     });
 }
 
+async function apiDelete(endpoint) {
+    return await apiCall(endpoint, {
+        method: 'DELETE'
+    });
+}
+
 // UI Helper Functions
 function showLoading(section = 'clustersSection') {
     document.getElementById(`${section}Loading`)?.classList.remove('hidden');
@@ -211,7 +217,7 @@ function displayClusters(clusters) {
     emptyState.classList.add('hidden');
 
     const clustersHtml = clusters.map(cluster => `
-        <div class="cluster-card" onclick="viewClusterDetails('${cluster.id}')">
+        <div class="cluster-card">
             <div class="cluster-card-header">
                 <div>
                     <div class="cluster-name">${cluster.name}</div>
@@ -239,14 +245,18 @@ function displayClusters(clusters) {
                 </div>
             </div>
 
-            <div class="cluster-actions" style="display: flex; gap: 8px; margin-top: 12px;">
-                <button onclick="event.stopPropagation(); refreshCluster('${cluster.id}', '${cluster.name}')" 
-                        class="btn-refresh" style="flex: 1;">
+            <div class="cluster-actions">
+                <button onclick="refreshCluster('${cluster.id}', '${cluster.name}')" 
+                        class="btn-refresh">
                     🔄 Refresh
                 </button>
-                <button onclick="event.stopPropagation(); viewClusterDetails('${cluster.id}')" 
-                        class="btn-primary" style="flex: 2;">
+                <button onclick="viewClusterDetails('${cluster.id}')" 
+                        class="btn-primary">
                     View Details
+                </button>
+                <button onclick="deleteCluster('${cluster.id}', '${cluster.name}')" 
+                        class="btn-delete">
+                    🗑️ Delete
                 </button>
             </div>
         </div>
@@ -269,6 +279,27 @@ async function refreshCluster(clusterId, clusterName) {
         
     } catch (error) {
         showNotification(`Failed to refresh cluster: ${error.message}`, 'error');
+    }
+}
+
+// Delete cluster function
+async function deleteCluster(clusterId, clusterName) {
+    if (!confirm(`Are you sure you want to delete cluster "${clusterName}"?\n\nThis will:\n• Remove the cluster from the dashboard\n• Delete all associated nodes data\n• Remove the kubeconfig from storage\n\nThis action cannot be undone!`)) {
+        return;
+    }
+
+    try {
+        showNotification(`Deleting cluster ${clusterName}...`, 'info');
+        
+        await apiDelete(`/api/clusters/${clusterId}`);
+        
+        showNotification(`Cluster ${clusterName} deleted successfully!`, 'success');
+        
+        // Reload the clusters list
+        loadClusters();
+        
+    } catch (error) {
+        showNotification(`Failed to delete cluster: ${error.message}`, 'error');
     }
 }
 

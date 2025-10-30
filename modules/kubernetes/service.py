@@ -7,6 +7,7 @@ import tempfile
 import os
 import json
 import base64
+import logging
 from pathlib import Path
 
 from .models import KubernetesCluster, ClusterNode
@@ -16,6 +17,8 @@ from .schemas import (
     ClusterNodeSummary
 )
 from utils.encryption import encryption_manager
+
+logger = logging.getLogger(__name__)
 
 class KubernetesClusterService:
     def __init__(self, db: Session):
@@ -70,7 +73,7 @@ class KubernetesClusterService:
         if cluster_data.auth_type == 'token':
             # For token auth, use the provided API server
             api_server = cluster_data.api_server
-            print(f"DEBUG: Using provided API server for token auth: {api_server}")
+            logger.info(f"Using provided API server for token auth: {api_server}")
         elif cluster_data.auth_type == 'kubeconfig':
             # Extract API server from kubeconfig
             try:
@@ -78,9 +81,9 @@ class KubernetesClusterService:
                 clusters = config.get('clusters', [])
                 if clusters:
                     api_server = clusters[0].get('cluster', {}).get('server')
-                    print(f"DEBUG: Extracted API server from kubeconfig: {api_server}")
+                    logger.info(f"Extracted API server from kubeconfig: {api_server}")
             except Exception as e:
-                print(f"Warning: Could not extract API server from kubeconfig: {e}")
+                logger.warning(f"Could not extract API server from kubeconfig: {e}")
         
         # Validate that API server is set for token auth
         if cluster_data.auth_type == 'token' and not api_server:
@@ -88,7 +91,13 @@ class KubernetesClusterService:
         
         # Determine authentication type and encrypt accordingly
         auth_type = cluster_data.auth_type
-        encrypted_auth_data = encryption_manager.encrypt_data(cluster_data.auth_data)
+        
+        try:
+            encrypted_auth_data = encryption_manager.encrypt_data(cluster_data.auth_data)
+            logger.info("Successfully encrypted cluster authentication data")
+        except Exception as e:
+            logger.error(f"Failed to encrypt cluster data: {e}")
+            raise ValueError(f"Failed to secure cluster credentials: {e}")
         
         # Extract cluster info for description
         cluster_info = self._extract_cluster_info(cluster_data.auth_data, auth_type, api_server)
@@ -107,7 +116,7 @@ class KubernetesClusterService:
             status='registered'
         )
         
-        print(f"DEBUG: Creating cluster with API server: {api_server}")
+        logger.info(f"Creating cluster '{cluster_data.name}' with API server: {api_server}")
         
         self.db.add(cluster)
         self.db.commit()
@@ -115,12 +124,12 @@ class KubernetesClusterService:
         
         # Immediately try to get actual node counts after registration
         try:
-            print(f"DEBUG: Attempting to get initial node counts for cluster {cluster.id}")
+            logger.info(f"Attempting to get initial node counts for cluster {cluster.id}")
             summary = self.get_cluster_node_summary(cluster.id, user_id)
             if "error" not in summary:
-                print(f"DEBUG: Initial node counts - Masters: {summary['master_nodes']}, Workers: {summary['worker_nodes']}")
+                logger.info(f"Initial node counts - Masters: {summary['master_nodes']}, Workers: {summary['worker_nodes']}")
         except Exception as e:
-            print(f"DEBUG: Failed to get initial node counts: {e}")
+            logger.warning(f"Failed to get initial node counts: {e}")
         
         return cluster
     
@@ -229,13 +238,22 @@ class KubernetesClusterService:
             )
     
     def get_cluster_auth_data(self, cluster_id: uuid.UUID, user_id: uuid.UUID) -> tuple[Optional[str], Optional[str]]:
-        """Get decrypted authentication data and type for a cluster"""
+        """Get decrypted authentication data and type for a cluster with graceful error handling"""
         cluster = self.get_cluster_by_id(cluster_id)
-        if not cluster or cluster.user_id != user_id or not cluster.kubeconfig:
+        if not cluster or cluster.user_id != user_id:
             return None, None
         
-        auth_data = encryption_manager.decrypt_data(cluster.kubeconfig)
-        return auth_data, cluster.auth_type
+        if not cluster.kubeconfig:
+            return None, None
+        
+        try:
+            auth_data = encryption_manager.decrypt_data(cluster.kubeconfig)
+            return auth_data, cluster.auth_type
+        except Exception as e:
+            logger.error(f"Failed to decrypt kubeconfig for cluster {cluster_id}: {e}")
+            # Don't change cluster status automatically in production
+            # Let the API handle this gracefully
+            return None, None
     
     def _get_kubectl_nodes(self, auth_data: str, auth_type: str, api_server: Optional[str] = None) -> List[Dict[str, Any]]:
         """Execute kubectl get nodes command using appropriate authentication"""
@@ -336,14 +354,17 @@ class KubernetesClusterService:
         
         auth_data, auth_type = self.get_cluster_auth_data(cluster_id, user_id)
         if not auth_data:
-            return {"error": "Cluster authentication data not available"}
+            return {
+                "error": "Cluster authentication data unavailable. The cluster may need to be re-registered due to encryption key changes.",
+                "needs_re_registration": True
+            }
         
         try:
             # Use the stored API server from the cluster record
             api_server = cluster.api_server
-            print(f"DEBUG: Using API server from cluster: {api_server}")
-            print(f"DEBUG: Auth type: {auth_type}")
-            print(f"DEBUG: Auth data available: {len(auth_data) if auth_data else 0} chars")
+            logger.debug(f"Using API server from cluster: {api_server}")
+            logger.debug(f"Auth type: {auth_type}")
+            logger.debug(f"Auth data available: {len(auth_data) if auth_data else 0} chars")
             
             # Validate API server for token auth
             if auth_type == 'token' and not api_server:
@@ -351,19 +372,19 @@ class KubernetesClusterService:
             
             # Get nodes from actual cluster
             nodes_info = self._get_kubectl_nodes(auth_data, auth_type, api_server)
-            print(f"DEBUG: Retrieved {len(nodes_info)} nodes from cluster")
+            logger.info(f"Retrieved {len(nodes_info)} nodes from cluster {cluster_id}")
             
             # Count master and worker nodes
             master_count = sum(1 for node in nodes_info if self._is_master_node(node))
             worker_count = len(nodes_info) - master_count
             
-            print(f"DEBUG: Node counts - Masters: {master_count}, Workers: {worker_count}")
+            logger.info(f"Node counts for cluster {cluster_id} - Masters: {master_count}, Workers: {worker_count}")
             
             # Update cluster record with actual counts
             if cluster:
                 cluster.master_nodes = master_count
                 cluster.worker_nodes = worker_count
-                cluster.status = 'registered'  # Update status to registered
+                cluster.status = 'registered'
                 self.db.commit()
             
             return {
@@ -376,8 +397,8 @@ class KubernetesClusterService:
             }
             
         except Exception as e:
-            print(f"DEBUG: Error getting cluster nodes: {str(e)}")
-            # Return current database values if we can't connect to cluster
+            logger.error(f"Error getting cluster nodes for {cluster_id}: {str(e)}")
+            # Return current database values with error info
             return {
                 "total_nodes": cluster.master_nodes + cluster.worker_nodes,
                 "master_nodes": cluster.master_nodes,
@@ -385,7 +406,7 @@ class KubernetesClusterService:
                 "nodes": [],
                 "auth_type": auth_type,
                 "status": "error",
-                "error": f"Failed to get live cluster data: {str(e)}"
+                "error": f"Failed to connect to cluster: {str(e)}"
             }
     
     def _extract_api_server_from_auth(self, auth_data: str, auth_type: str) -> Optional[str]:
@@ -443,8 +464,8 @@ class KubernetesClusterService:
             
             return nodes_info
         except Exception as e:
-            print(f"DEBUG: Error parsing nodes JSON: {e}")
-            print(f"DEBUG: JSON output: {json_output[:500]}...")  # First 500 chars for debugging
+            logger.error(f"Error parsing nodes JSON: {e}")
+            logger.debug(f"JSON output: {json_output[:500]}...")  # First 500 chars for debugging
             raise e
     
     def _is_master_node(self, node_info: Dict[str, Any]) -> bool:
@@ -510,11 +531,11 @@ class KubernetesClusterService:
             pass
                 
         except Exception as e:
-            print(f"Error parsing cluster nodes: {e}")
+            logger.error(f"Error parsing cluster nodes: {e}")
     
     def refresh_cluster_nodes(self, cluster_id: uuid.UUID, user_id: uuid.UUID) -> Dict[str, Any]:
         """Refresh cluster nodes from actual Kubernetes cluster"""
-        print(f"DEBUG: Refreshing nodes for cluster {cluster_id}")
+        logger.info(f"Refreshing nodes for cluster {cluster_id}")
         result = self.get_cluster_node_summary(cluster_id, user_id)
         
         if "error" in result:
@@ -567,7 +588,7 @@ class KubernetesClusterService:
         if not cluster or cluster.user_id != user_id:
             return None
         
-        print(f"DEBUG: Updating cluster {cluster_id} with API server: {api_server}")
+        logger.info(f"Updating cluster {cluster_id} with API server: {api_server}")
         cluster.api_server = api_server
         self.db.commit()
         self.db.refresh(cluster)
@@ -602,3 +623,21 @@ class KubernetesClusterService:
             "live_data_available": live_data_available,
             "auth_data_length": len(auth_data) if auth_data else 0
         }
+    
+    def migrate_cluster_encryption(self, cluster_id: uuid.UUID, user_id: uuid.UUID, new_kubeconfig: str) -> bool:
+        """Migrate a cluster to use new encryption key"""
+        cluster = self.get_cluster_by_id(cluster_id)
+        if not cluster or cluster.user_id != user_id:
+            return False
+        
+        try:
+            # Encrypt with new key
+            encrypted_kubeconfig = encryption_manager.encrypt_data(new_kubeconfig)
+            cluster.kubeconfig = encrypted_kubeconfig
+            cluster.status = 'registered'
+            self.db.commit()
+            logger.info(f"Successfully migrated cluster {cluster_id} to new encryption key")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to migrate cluster encryption for {cluster_id}: {e}")
+            return False
